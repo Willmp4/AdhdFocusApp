@@ -2,3 +2,4 @@ Flask
 flask_sqlalchemy
 flask_jwt_extended
 psycopg2-binary 
+boto3
