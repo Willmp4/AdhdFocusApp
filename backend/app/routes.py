@@ -13,7 +13,7 @@ def register_routes(app):
         if username is None or password is None:
             return jsonify({"message": "Missing username or password"}), 400
         if User.query.filter_by(username=username).first() is not None:
-            return jsonify({"message": "User already exists"}), 400
+            return jsonify({"message": "User already exists"}), 400#
 
         user = User(username=username)
         user.set_password(password)
@@ -27,6 +27,7 @@ def register_routes(app):
         user = User.query.filter_by(username=data.get('username')).first()
         if user is None or not user.check_password(data.get('password')):
             return jsonify({'message': 'Invalid username or password'}), 401
+        
 
         access_token = create_access_token(identity=data['username'])
         return jsonify(access_token=access_token), 200
