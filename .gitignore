@@ -1,4 +1,5 @@
 /backend/focus-backend/
 /frontend/node_modules/
-*.pyc
+/backend/app/pycache/*.pyc
 settings.json
+backend/app/__pycache__/*.pyc
