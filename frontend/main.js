@@ -45,4 +45,14 @@ ipcMain.on("login", async (event, args) => {
     console.error("Login error:", error); // Error log
     event.reply("login-reply", { message: "Login failed", error: error.message });
   }
+  
+  ipcMain.on('upload-activity', async (event, args) => {
+    try {
+      const response = await axios.post('http://localhost:5000/activity', args);
+      event.reply('activity-upload-response', { message: 'Data uploaded successfully' });
+    } catch (error) {
+      event.reply('activity-upload-response', { message: 'Upload failed', error: error.message });
+    }
+  });
+  
 });
