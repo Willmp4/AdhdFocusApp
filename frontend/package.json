@@ -5,12 +5,16 @@
   "main": "main.js",
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1",
-    "start": "electron ."
+    "start": "electron .",
+    "convert-tfjs": "node_modules/.bin/tensorflowjs_converter --input_format=tf_saved_model ./gaze_model ./gaze_model_web"
   },
   "keywords": [],
   "author": "",
   "license": "ISC",
   "dependencies": {
+    "@tensorflow/tfjs": "^4.18.0",
+    "@tensorflow/tfjs-converter": "^4.18.0",
+    "@tensorflow/tfjs-node": "^4.18.0",
     "axios": "^1.6.8",
     "electron": "^30.0.1"
   }
