@@ -1,7 +1,7 @@
 from flask import request, jsonify, current_app
 from werkzeug.security import check_password_hash
 from .database import db
-from .models import User
+from .models import User, ActivityLog
 from flask_jwt_extended import create_access_token
 
 def register_routes(app):
@@ -31,3 +31,20 @@ def register_routes(app):
 
         access_token = create_access_token(identity=data['username'])
         return jsonify(access_token=access_token), 200
+    
+    @app.route('/activity-log', methods=['POST'])
+    def log_activity():
+        data = request.get_json()
+        if not data or 'session_id' not in data or 'event_type' not in data:
+            return jsonify({"message": "Missing required data"}), 400
+
+        new_log = ActivityLog(
+            session_id=data['session_id'],
+            event_type=data['event_type'],
+            data=data.get('data')  # Additional data as JSON
+        )
+        db.session.add(new_log)
+        db.session.commit()
+        return jsonify({"message": "Activity logged successfully"}), 201
+
+
