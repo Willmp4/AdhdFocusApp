@@ -4,3 +4,7 @@
 settings.json
 backend/app/__pycache__/*.pyc
 *.pem
+frontend/adjustments_model/
+frontend/gaze_model/
+frontend/adjustment_model.pkl
+frontend/adjustment_model/
