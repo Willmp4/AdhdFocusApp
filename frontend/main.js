@@ -1,8 +1,13 @@
 const { app, BrowserWindow, ipcMain } = require("electron");
 const axios = require("axios");
+const GazePredictor = require("./GazePredictor");
+const { createFromBuffer } = require("image-js");
+
+let win;
+let gazePredictor;
 
 function createWindow() {
-  let win = new BrowserWindow({
+  win = new BrowserWindow({
     width: 800,
     height: 600,
     webPreferences: {
@@ -13,10 +18,12 @@ function createWindow() {
 
   win.loadFile("main.html");
   win.webContents.openDevTools(); // Open developer tools for debugging
+  gazePredictor = new GazePredictor(); // Initialize the GazePredictor
 }
 
 app.whenReady().then(createWindow);
 
+// Authentication routes
 ipcMain.on("register", async (event, args) => {
   console.log("Received register event:", args); // Debug log
   try {
@@ -45,14 +52,19 @@ ipcMain.on("login", async (event, args) => {
     console.error("Login error:", error); // Error log
     event.reply("login-reply", { message: "Login failed", error: error.message });
   }
-  
-  ipcMain.on('upload-activity', async (event, args) => {
-    try {
-      const response = await axios.post('http://localhost:5000/activity', args);
-      event.reply('activity-upload-response', { message: 'Data uploaded successfully' });
-    } catch (error) {
-      event.reply('activity-upload-response', { message: 'Upload failed', error: error.message });
-    }
-  });
-  
+});
+
+// Gaze Prediction route
+ipcMain.on("predict-gaze", async (event, imageData) => {
+  try {
+    // Convert the base64 image data to an image object
+    const image = await createFromBuffer(Buffer.from(imageData.split(',')[1], 'base64'));
+    console.log("Processing gaze prediction...");
+    const prediction = await gazePredictor.predictGaze(image);
+    console.log("Gaze prediction:", prediction);
+    event.reply("gaze-prediction", prediction);
+  } catch (error) {
+    console.error("Error in gaze prediction:", error);
+    event.reply("gaze-prediction", [null, null, null, null]);
+  }
 });
