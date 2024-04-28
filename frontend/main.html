@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html>
 <head>
-  <title>Electron Auth</title>
+  <title>Electron Auth and Gaze Tracking</title>
 </head>
 <body>
   <h2>Register</h2>
@@ -17,6 +17,12 @@
     <input type="password" id="login-password" placeholder="Password" required>
     <button type="submit">Login</button>
   </form>
+
+  <!-- Video and Canvas for Gaze Tracking -->
+  <div style="display:none;" id="video-container">
+    <video id="video-input" width="640" height="480" autoplay></video>
+    <canvas id="gaze-canvas"></canvas>
+  </div>
 
   <script src="renderer.js"></script>
 </body>
