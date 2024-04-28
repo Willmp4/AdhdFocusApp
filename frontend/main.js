@@ -55,16 +55,15 @@ ipcMain.on("login", async (event, args) => {
 });
 
 // Gaze Prediction route
-ipcMain.on("predict-gaze", async (event, imageData) => {
+// In main.js
+ipcMain.on("predict-gaze", async (event, buffer, dimensions) => {
   try {
-    // Convert the base64 image data to an image object
-    const image = await createFromBuffer(Buffer.from(imageData.split(',')[1], 'base64'));
-    console.log("Processing gaze prediction...");
+    const image = await createFromBuffer(buffer, {width: dimensions.width, height: dimensions.height});
     const prediction = await gazePredictor.predictGaze(image);
-    console.log("Gaze prediction:", prediction);
     event.reply("gaze-prediction", prediction);
   } catch (error) {
     console.error("Error in gaze prediction:", error);
     event.reply("gaze-prediction", [null, null, null, null]);
   }
 });
+

@@ -46,20 +46,23 @@ function initializeVideo() {
       console.error("Error accessing the camera:", err);
     });
 
-  video.addEventListener('play', () => {
-    const canvas = document.createElement('canvas');
-    canvas.width = video.videoWidth;
-    canvas.height = video.videoHeight;
-    const ctx = canvas.getContext('2d');
+// In renderer.js
+video.addEventListener('play', () => {
+  const canvas = document.createElement('canvas');
+  canvas.width = video.videoWidth;
+  canvas.height = video.videoHeight;
+  const ctx = canvas.getContext('2d');
 
-    (function updateFrame() {
-      ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
-      const imageData = canvas.toDataURL('image/jpeg');
-      ipcRenderer.send("predict-gaze", imageData);
+  (function updateFrame() {
+    ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+    const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+    const buffer = Buffer.from(imageData.data.buffer);
 
-      requestAnimationFrame(updateFrame);
-    })();
-  });
+    ipcRenderer.send("predict-gaze", buffer, {width: canvas.width, height: canvas.height});
+    requestAnimationFrame(updateFrame);
+  })();
+});
+
 }
 
 // Update canvas with gaze points
