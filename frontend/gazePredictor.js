@@ -1,9 +1,9 @@
-import * as faceapi from "face-api.js";
-import * as tf from "@tensorflow/tfjs-node";
-import { screen } from "electron";
-import path from "path";
+const faceapi = require("face-api.js");
+const tf = require("@tensorflow/tfjs");
+const { screen } = require("electron");
+const path = require("path");
 
-export class GazePredictor {
+class GazePredictor {
   constructor(screenDimensions = screen.getPrimaryDisplay().size) {
     this.screenWidth = screenDimensions.width;
     this.screenHeight = screenDimensions.height;
@@ -11,17 +11,21 @@ export class GazePredictor {
   }
 
   async loadModels() {
-    // Load the face-api.js models
-    await faceapi.nets.ssdMobilenetv1.loadFromUri("/models");
-    await faceapi.nets.faceLandmark68Net.loadFromUri("/models");
+    try {
+      const modelPath = path.resolve(__dirname, "models");
+      console.log("Loading models from:", modelPath);
 
-    // Load the TensorFlow.js eye gaze model
-    const gazeModelUrl = path.join(__dirname, "gaze_model", "model.json");
-    this.model = await tf.loadGraphModel(`file://${gazeModelUrl}`);
+      await faceapi.nets.ssdMobilenetv1.loadFromDisk(modelPath);
+      await faceapi.nets.faceLandmark68Net.loadFromDisk(modelPath);
 
-    // Load the adjustment model from the 'adjustment_model' folder
-    const adjustmentModelUrl = path.join(__dirname, "adjustment_model", "model.json");
-    this.adjustmentModel = await tf.loadGraphModel(`file://${adjustmentModelUrl}`);
+      const gazeModelUrl = path.resolve(__dirname, "gaze_model", "model.json");
+      this.model = await tf.loadGraphModel(`file://${gazeModelUrl}`);
+
+      const adjustmentModelUrl = path.resolve(__dirname, "adjustment_model", "model.json");
+      this.adjustmentModel = await tf.loadGraphModel(`file://${adjustmentModelUrl}`);
+    } catch (error) {
+      console.error("Failed to load models:", error);
+    }
   }
 
   async extractEyeRegion(image, landmarks) {
@@ -46,7 +50,7 @@ export class GazePredictor {
       const landmarks = detection.landmarks;
       const combinedEyeRegion = await this.extractEyeRegion(frame, landmarks);
       if (combinedEyeRegion) {
-        const resized = tf.image.resizeBilinear(tf.browser.fromPixels(combinedEyeRegion), [200, 100]);
+        const resized = tf.image.resizeBilinear(tf.browser.fromPixels(combinedEyeRegion),   [200, 100]);
         return resized.div(tf.scalar(255.0));
       }
     }
@@ -71,3 +75,4 @@ export class GazePredictor {
     return [null, null, null, null];
   }
 }
+module.exports = GazePredictor;
