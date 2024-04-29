@@ -1,6 +1,6 @@
 const { app, BrowserWindow, ipcMain } = require("electron");
 const axios = require("axios");
-const GazePredictor = require("./GazePredictor");
+const GazePredictor = require("./gazePredictor");
 const { createFromBuffer } = require("image-js");
 
 let win;
@@ -13,11 +13,12 @@ function createWindow() {
     webPreferences: {
       nodeIntegration: true,
       contextIsolation: false, // Security warning noted
+      webviewTag: true, // Make sure this is set to true
     },
   });
-
-  win.loadFile("main.html");
   win.webContents.openDevTools(); // Open developer tools for debugging
+  win.loadFile("main.html");
+
   gazePredictor = new GazePredictor(); // Initialize the GazePredictor
 }
 
@@ -58,7 +59,7 @@ ipcMain.on("login", async (event, args) => {
 // In main.js
 ipcMain.on("predict-gaze", async (event, buffer, dimensions) => {
   try {
-    const image = await createFromBuffer(buffer, {width: dimensions.width, height: dimensions.height});
+    const image = await createFromBuffer(buffer, { width: dimensions.width, height: dimensions.height });
     const prediction = await gazePredictor.predictGaze(image);
     event.reply("gaze-prediction", prediction);
   } catch (error) {
@@ -66,4 +67,3 @@ ipcMain.on("predict-gaze", async (event, buffer, dimensions) => {
     event.reply("gaze-prediction", [null, null, null, null]);
   }
 });
-
