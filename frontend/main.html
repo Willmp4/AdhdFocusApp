@@ -2,14 +2,14 @@
 <html>
 <head>
   <title>Electron Auth and Gaze Tracking</title>
-  <link rel="stylesheet" href="../css/style.css">
 </head>
 <body>
   <h1>Application Dashboard</h1>
   <div style="display: flex; justify-content: space-around;">
-    <webview id="loginView" src="login.html" style="width: 30%; height: 500px;"></webview>
-    <webview id="registerView" src="register.html" style="width: 30%; height: 500px;"></webview>
-    <webview id="gazeView" src="predictGaze.html" style="width: 30%; height: 500px;"></webview>
+    <webview id="loginView" src="./renderer/html/login.html" style="width: 30%; height: 500px;"></webview>
+    <webview id="registerView" src="./renderer/html/register.html" style="width: 30%; height: 500px;"></webview>
+    <webview id="gazeView" src="./renderer/html/predictGaze.html" style="width: 30%; height: 500px;"></webview>
+    
   </div>
 
   <script>
