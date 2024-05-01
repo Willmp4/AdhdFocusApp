@@ -1,8 +1,6 @@
 /backend/focus-backend/
-/frontend/node_modules/
+/frontend/focus-app-frontend/
 /backend/app/pycache/*.pyc
 settings.json
 backend/app/__pycache__/*.pyc
 *.pem
-frontend/adjustment_model.pkl
-frontend/models/
