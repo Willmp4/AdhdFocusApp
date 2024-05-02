@@ -2,8 +2,7 @@ import tkinter as tk
 from tkinter import messagebox
 from api import register_user, login_user, predict_gaze
 
-def setup_gui(root):
-    # Create frames or other components here
+def setup_gui(root, activity_monitor):
     login_frame = tk.Frame(root)
     login_frame.pack()
 
@@ -17,3 +16,5 @@ def setup_gui(root):
     login_button = tk.Button(login_frame, text="Login", command=lambda: login_user(username_entry.get(), password_entry.get()))
     login_button.pack()
 
+    start_monitor_button = tk.Button(login_frame, text="Start Monitoring", command=activity_monitor.start_monitoring)
+    start_monitor_button.pack()
