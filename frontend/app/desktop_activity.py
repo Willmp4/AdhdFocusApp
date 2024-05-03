@@ -11,6 +11,7 @@ import json
 import cv2
 from gaze_predictor import GazePredictor
 
+
 class ActivityMonitor:
     MOUSE_MOVE_THROTTLE = 0.5
     ASK_FOCUS_LEVEL_INTERVAL = 30 * 60
@@ -33,9 +34,9 @@ class ActivityMonitor:
         self.gaze_start_position = None
         self.keyboard_session_active = False
         self.gaze_predictor = GazePredictor(
-            model_path='./eye_gaze_v31_20.h5',
-            adjustment_model_path='./adjustment_model.pkl',
-            shape_predictor_path='./shape_predictor_68_face_landmarks.dat',
+            model_path='./models/eye_gaze_v31_20.h5',
+            adjustment_model_path='./models/adjustment_model.pkl',
+            shape_predictor_path='./models/shape_predictor_68_face_landmarks.dat',
         )
 
     def log_event(self, event_type, data):
