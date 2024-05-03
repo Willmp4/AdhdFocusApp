@@ -4,3 +4,7 @@
 settings.json
 backend/app/__pycache__/*.pyc
 *.pem
+frontend/app/__pycache__/*.pyc
+frontend/app/models/shape_predictor_68_face_landmarks.dat
+frontend/app/models/eye_gaze_v31_20.h5
+frontend/app/models/adjustment_model.pkl
