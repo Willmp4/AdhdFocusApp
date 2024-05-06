@@ -5,6 +5,7 @@ import cv2
 import pickle
 import numpy as np
 from image_processor import ImageProcessor
+
 class CalibrationComponent:
     def __init__(self, root, on_calibration_complete, image_processor):
         self.root = root
@@ -19,6 +20,8 @@ class CalibrationComponent:
         self.generate_calibration_points()
         self.display_point()
         self.root.bind('<space>', self.handle_spacebar)
+        # Initialize the webcam
+        self.cap = cv2.VideoCapture(0)  # Argument is the index of the webcam
 
     def generate_calibration_points(self):
         offset = 20
@@ -50,22 +53,26 @@ class CalibrationComponent:
             self.on_calibration_complete()
 
     def capture_and_process_image(self):
-        # Capture screen and process the image
-        screenshot = pag.screenshot()
-        open_cv_image = cv2.cvtColor(np.array(screenshot), cv2.COLOR_RGB2BGR)
-        processed_image = self.image_processor.get_combined_eyes(open_cv_image, self.image_processor.detector, self.image_processor.predictor)
+        # Capture image from the webcam
+        ret, frame = self.cap.read()
+        if not ret:
+            print("Failed to capture image from webcam")
+            return None, None
+        processed_image = self.image_processor.get_combined_eyes(frame, self.image_processor.detector, self.image_processor.predictor)
         return processed_image, self.calibration_points[self.current_point]
 
     def handle_spacebar(self, event):
-        processed_image, gaze_coords = self.capture_and_process_image()  # Capture and process the image when spacebar is pressed
-        self.data_X.append(processed_image)
-        self.data_y.append(gaze_coords)
-        self.current_point += 1
-        if self.current_point >= len(self.calibration_points):
-            self.save_data()
-            self.on_calibration_complete()
-        else:
-            self.display_point()
+        processed_image, gaze_coords = self.capture_and_process_image()
+        if processed_image is not None:
+            self.data_X.append(processed_image)
+            self.data_y.append(gaze_coords)
+            self.current_point += 1
+            if self.current_point >= len(self.calibration_points):
+                self.save_data()
+                self.on_calibration_complete()
+                self.cap.release()  # Release the webcam resource
+            else:
+                self.display_point()
 
     def save_data(self):
         # Save all collected data to a pickle file
