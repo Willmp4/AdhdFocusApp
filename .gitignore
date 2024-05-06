@@ -10,4 +10,3 @@ frontend/app/models/eye_gaze_v31_20.h5
 frontend/app/*.pkl
 frontend/app/*.txt
 frontend/app/models/
-frontend/app/models/adjustment_model.pkl
