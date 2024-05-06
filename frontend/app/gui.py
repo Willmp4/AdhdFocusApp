@@ -2,12 +2,15 @@ import tkinter as tk
 from tkinter import messagebox
 import pyautogui as pag
 from api import register_user, login_user, has_been_calibrated, mark_as_calibrated
-from frontend.app.calibration_component import CalibrationComponent
+from calibration_component import CalibrationComponent
 from sklearn.ensemble import RandomForestRegressor
-from sklearn.externals import joblib
 import numpy as np
 import pickle
 import os
+import dlib
+from image_processor import ImageProcessor
+from keras.models import load_model
+from sklearn.preprocessing import StandardScaler
 
 def load_data(calibration_file):
     # Load calibration data from a pickle file
@@ -17,23 +20,58 @@ def load_data(calibration_file):
     labels = np.array(data['gaze_coords'])
     return features, labels
 
-def update_model(username, model_path='eye_gaze_model.pkl'):
-    calibration_file = f'calibration_data_{username}.pkl'  # File path for user-specific calibration data
-    if not os.path.exists(calibration_file):
-        print("Calibration file does not exist.")
-        return
-
-    model = joblib.load(model_path) if os.path.exists(model_path) else RandomForestRegressor(n_estimators=100)
+def gaze_predict(model_path='./models/eye_gaze_v31_20.h5', calibration_file='calibration_data.pkl'):
     features, labels = load_data(calibration_file)
-    model.fit(features, labels)
-    joblib.dump(model, model_path)
+
+    gaze_model = load_model(model_path)
+
+    #Predict gaze points for each image in the calibration dataset
+    predicted_gaze_points = []
+    for image in features:
+        image_reshaped = np.expand_dims(image, axis=0)
+        predicted_point = gaze_model.predict(image_reshaped)[0][0]
+        predicted_gaze_points.append(predicted_point)
+
+    # Create the dataset for the adjustment model
+    adjustment_dataset = {
+        'predicted_gaze_points': predicted_gaze_points,
+        'actual_gaze_points': labels
+    }
+
+    return adjustment_dataset
+
+def save_model(model, model_path='./models/adjustment_model1.h5'):
+    print("Saving model to", model_path)
+    # Save the trained model to a file
+    model.save(model_path)
+
+    print("Model saved to", model_path)
+
+
+def update_model( model_path='./models/adjustment_model.h5'):
+
+    print("Loading existing model.")
+    model = load_model(model_path)
+
+    adjusment_dataset = gaze_predict()
+
+    X = np.squeeze(np.array(adjusment_dataset['predicted_gaze_points']))  # Remove extra dimensions
+    y = np.array(adjusment_dataset['actual_gaze_points'])[:, :2]  # Remove extra dimensions
+
+    # Normalize the data
+    scaler = StandardScaler()
+    X_scaled = scaler.fit_transform(X)
+    y_scaled = scaler.fit_transform(y)
+        
+    model.fit(X, y)
+    save_model(model)
     print("Model updated and saved.")
 
 class LoginFrame(tk.Frame):
-    def __init__(self, parent, controller, activity_monitor):
+    def __init__(self, parent, activity_monitor, show_frame):
         tk.Frame.__init__(self, parent)
-        self.controller = controller
         self.activity_monitor = activity_monitor
+        self.show_frame = show_frame
 
         username_label = tk.Label(self, text="Username:")
         username_label.pack()
@@ -56,49 +94,56 @@ class LoginFrame(tk.Frame):
                 # Launch calibration process
                 self.launch_calibration(username)
             else:
-                show_frame(MonitoringFrame, self.controller)
+                self.show_frame(MonitoringFrame)
         else:
             messagebox.showerror("Login failed", "The username or password is incorrect or an error occurred.")
 
     def launch_calibration(self, username):
         root = tk.Toplevel()
         root.title("Calibration Component")
+
+        detector = dlib.get_frontal_face_detector()
+        predictor = dlib.shape_predictor("./models/shape_predictor_68_face_landmarks.dat")
+
+        image_processor = ImageProcessor(detector, predictor)
         root.geometry(f"{pag.size()[0]}x{pag.size()[1]}")
-        app = CalibrationComponent(root, lambda: self.complete_calibration(username))
+
+        app = CalibrationComponent(root, lambda: self.complete_calibration(username), image_processor)
         root.mainloop()
 
     def complete_calibration(self, username):
         mark_as_calibrated(username)
-        update_model(username)  # Update the model with the new calibration data
-        show_frame(MonitoringFrame, self.controller)
+        update_model()  # Update the model with the new calibration data
+        print("Calibration complete!")
+        self.show_frame(MonitoringFrame)
 
 class MonitoringFrame(tk.Frame):
-    def __init__(self, parent, controller, activity_monitor):
+    def __init__(self, parent, activity_monitor,show_frame):
         tk.Frame.__init__(self, parent)
-        self.controller = controller
         self.activity_monitor = activity_monitor
+        self.show_frame = show_frame
 
         start_monitor_button = tk.Button(self, text="Start Monitoring", command=self.activity_monitor.start_monitoring)
         start_monitor_button.pack()
 
-        logout_button = tk.Button(self, text="Logout", command=lambda: show_frame(LoginFrame, controller))
+        logout_button = tk.Button(self, text="Logout", command=lambda: self.show_frame(LoginFrame))
         logout_button.pack()
 
 
 def setup_gui(root, activity_monitor):
     # Create a dictionary to hold references to different frames
     frames = {}
-
-    # Create instances of the different frames
-    for F in (LoginFrame, MonitoringFrame):
-        frame = F(parent=root, controller=root, activity_monitor=activity_monitor)
-        frames[F] = frame
-        frame.grid(row=0, column=0, sticky="nsew")
-
+    
     # This function helps in switching between frames
     def show_frame(frame_class):
         frame = frames[frame_class]
         frame.tkraise()
+
+    # Create instances of the different frames
+    for F in (LoginFrame, MonitoringFrame):
+        frame = F(parent=root, activity_monitor=activity_monitor, show_frame=show_frame)
+        frames[F] = frame
+        frame.grid(row=0, column=0, sticky="nsew")
 
     root.show_frame = show_frame
 
