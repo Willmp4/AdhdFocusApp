@@ -3,37 +3,29 @@ from tkinter import messagebox
 import pyautogui as pag
 from api import register_user, login_user, has_been_calibrated, mark_as_calibrated
 from frontend.app.calibration_component import CalibrationComponent
-from gui import show_frame
-
 from sklearn.ensemble import RandomForestRegressor
 from sklearn.externals import joblib
 import numpy as np
+import pickle
 import os
-from PIL import Image
 
-def extract_features(image_path):
-    img = Image.open(image_path)
-    return np.array(img).flatten()  # Simplified feature extraction
-
-def load_data(calibration_folder):
-    features = []
-    labels = []
-    for filename in os.listdir(calibration_folder):
-        if filename.endswith('.png'):
-            image_path = os.path.join(calibration_folder, filename)
-            coords = tuple(map(int, filename.replace("calibration_point_", "").replace(".png", "").split('_')))
-            feature = extract_features(image_path)
-            features.append(feature)
-            labels.append(coords)
-    return np.array(features), np.array(labels)
+def load_data(calibration_file):
+    # Load calibration data from a pickle file
+    with open(calibration_file, 'rb') as f:
+        data = pickle.load(f)
+    features = np.array(data['images'])
+    labels = np.array(data['gaze_coords'])
+    return features, labels
 
 def update_model(username, model_path='eye_gaze_model.pkl'):
-    calibration_folder = f'calibration_data_{username}'  # Folder for user-specific calibration data
+    calibration_file = f'calibration_data_{username}.pkl'  # File path for user-specific calibration data
+    if not os.path.exists(calibration_file):
+        print("Calibration file does not exist.")
+        return
+
     model = joblib.load(model_path) if os.path.exists(model_path) else RandomForestRegressor(n_estimators=100)
-    
-    features, labels = load_data(calibration_folder)
+    features, labels = load_data(calibration_file)
     model.fit(features, labels)
-    
     joblib.dump(model, model_path)
     print("Model updated and saved.")
 
@@ -69,7 +61,6 @@ class LoginFrame(tk.Frame):
             messagebox.showerror("Login failed", "The username or password is incorrect or an error occurred.")
 
     def launch_calibration(self, username):
-        # Assuming the calibration logic is encapsulated as described
         root = tk.Toplevel()
         root.title("Calibration Component")
         root.geometry(f"{pag.size()[0]}x{pag.size()[1]}")
@@ -92,3 +83,24 @@ class MonitoringFrame(tk.Frame):
 
         logout_button = tk.Button(self, text="Logout", command=lambda: show_frame(LoginFrame, controller))
         logout_button.pack()
+
+
+def setup_gui(root, activity_monitor):
+    # Create a dictionary to hold references to different frames
+    frames = {}
+
+    # Create instances of the different frames
+    for F in (LoginFrame, MonitoringFrame):
+        frame = F(parent=root, controller=root, activity_monitor=activity_monitor)
+        frames[F] = frame
+        frame.grid(row=0, column=0, sticky="nsew")
+
+    # This function helps in switching between frames
+    def show_frame(frame_class):
+        frame = frames[frame_class]
+        frame.tkraise()
+
+    root.show_frame = show_frame
+
+    # Initially show the LoginFrame
+    show_frame(LoginFrame)
