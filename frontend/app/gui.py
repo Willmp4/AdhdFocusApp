@@ -73,6 +73,18 @@ class LoginFrame(tk.Frame):
         self.activity_monitor = activity_monitor
         self.show_frame = show_frame
 
+        self.pack_propagate(False)  # Prevent the frame from resizing to fit its contents
+        frame_width = 300  # Define the width of the frame
+        frame_height = 200  # Define the height of the frame
+        self.config(width=frame_width, height=frame_height)
+
+        # Centering the frame inside the parent window
+        screen_width = self.winfo_screenwidth()
+        screen_height = self.winfo_screenheight()
+        x = (screen_width / 2) - (frame_width / 2)
+        y = (screen_height / 2) - (frame_height / 2)
+        self.place(x=x, y=y)  # Place the frame at the center of the window
+
         username_label = tk.Label(self, text="Username:")
         username_label.pack()
         self.username_entry = tk.Entry(self)

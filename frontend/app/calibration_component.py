@@ -20,6 +20,8 @@ class CalibrationComponent:
         self.generate_calibration_points()
         self.display_point()
         self.root.bind('<space>', self.handle_spacebar)
+        self.root.bind('<F11>', self.toggle_fullscreen)
+        self.root.attributes('-fullscreen', True)
         # Initialize the webcam
         self.cap = cv2.VideoCapture(0)  # Argument is the index of the webcam
 
@@ -83,6 +85,7 @@ class CalibrationComponent:
 
 def on_calibration_complete():
     print("Calibration complete!")
+    root.destroy()
 
 if __name__ == "__main__":
     root = tk.Tk()
