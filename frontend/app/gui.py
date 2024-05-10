@@ -3,7 +3,6 @@ from tkinter import messagebox
 import pyautogui as pag
 from api import register_user, login_user, has_been_calibrated, mark_as_calibrated
 from calibration_component import CalibrationComponent
-from sklearn.ensemble import RandomForestRegressor
 import numpy as np
 import pickle
 import os
@@ -58,11 +57,6 @@ def update_model( model_path='./models/adjustment_model.h5'):
     X = np.squeeze(np.array(adjusment_dataset['predicted_gaze_points']))  # Remove extra dimensions
     y = np.array(adjusment_dataset['actual_gaze_points'])[:, :2]  # Remove extra dimensions
 
-    # Normalize the data
-    scaler = StandardScaler()
-    X_scaled = scaler.fit_transform(X)
-    y_scaled = scaler.fit_transform(y)
-        
     model.fit(X, y)
     save_model(model)
     print("Model updated and saved.")
