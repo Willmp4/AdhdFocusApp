@@ -1,6 +1,5 @@
 import tkinter as tk
 import pyautogui as pag
-from PIL import Image
 import cv2
 import pickle
 import numpy as np
@@ -20,10 +19,11 @@ class CalibrationComponent:
         self.generate_calibration_points()
         self.display_point()
         self.root.bind('<space>', self.handle_spacebar)
-        self.root.bind('<F11>', self.toggle_fullscreen)
-        self.root.attributes('-fullscreen', True)
         # Initialize the webcam
-        self.cap = cv2.VideoCapture(0)  # Argument is the index of the webcam
+        try:
+            self.cap = cv2.VideoCapture(0)  # Argument is the index of the webcam
+        except Exception as e:
+            print("Failed to initialize webcam:", str(e))
 
     def generate_calibration_points(self):
         offset = 20
