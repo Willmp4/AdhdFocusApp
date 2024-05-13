@@ -9,7 +9,6 @@ import os
 import dlib
 from image_processor import ImageProcessor
 from keras.models import load_model
-from sklearn.preprocessing import StandardScaler
 
 def load_data(calibration_file):
     # Load calibration data from a pickle file
@@ -57,6 +56,7 @@ def update_model( model_path='./models/adjustment_model.h5'):
     X = np.squeeze(np.array(adjusment_dataset['predicted_gaze_points']))  # Remove extra dimensions
     y = np.array(adjusment_dataset['actual_gaze_points'])[:, :2]  # Remove extra dimensions
 
+        
     model.fit(X, y)
     save_model(model)
     print("Model updated and saved.")
@@ -66,18 +66,6 @@ class LoginFrame(tk.Frame):
         tk.Frame.__init__(self, parent)
         self.activity_monitor = activity_monitor
         self.show_frame = show_frame
-
-        self.pack_propagate(False)  # Prevent the frame from resizing to fit its contents
-        frame_width = 300  # Define the width of the frame
-        frame_height = 200  # Define the height of the frame
-        self.config(width=frame_width, height=frame_height)
-
-        # Centering the frame inside the parent window
-        screen_width = self.winfo_screenwidth()
-        screen_height = self.winfo_screenheight()
-        x = (screen_width / 2) - (frame_width / 2)
-        y = (screen_height / 2) - (frame_height / 2)
-        self.place(x=x, y=y)  # Place the frame at the center of the window
 
         username_label = tk.Label(self, text="Username:")
         username_label.pack()
