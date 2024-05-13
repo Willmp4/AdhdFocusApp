@@ -12,17 +12,13 @@ class GazePredictor:
         self.global_detector = dlib.get_frontal_face_detector()
         self.global_predictor = dlib.shape_predictor(shape_predictor_path)
         self.model = self.load_keras_model(model_path)
-        self.adjustment_model = self.load_pickle_model(adjustment_model_path)
+        self.adjustment_model = self.load_keras_model(adjustment_model_path)
         self.gaze_points_queue = deque(maxlen=5)
         self.adjusted_gaze_points_queue = deque(maxlen=5)
 
     def load_keras_model(self, model_path):
         return load_model(model_path)
 
-    def load_pickle_model(self, model_path):
-        with open(model_path, 'rb') as f:
-            return pickle.load(f)
-        
     def extract_eye_region(self, image, landmarks, left_eye_points, right_eye_points, nose_bridge_points, forehead_points):
         # Combine the eye, nose bridge, and forehead points
         eye_points = left_eye_points + right_eye_points
