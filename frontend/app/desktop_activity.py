@@ -10,8 +10,8 @@ import pygetwindow as gw
 import json
 import cv2
 from gaze_predictor import GazePredictor
-
-
+from focus_predictor import FocusPredictor
+import os
 class ActivityMonitor:
     MOUSE_MOVE_THROTTLE = 0.5
     ASK_FOCUS_LEVEL_INTERVAL = 30 * 60
@@ -33,9 +33,11 @@ class ActivityMonitor:
         self.gaze_start_time = None
         self.gaze_start_position = None
         self.keyboard_session_active = False
+        self.focus_predictor = FocusPredictor('./models/model.h5','./models/encoder.pkl', './models/scaler.pkl')
+        self.prediction_thread = None
         self.gaze_predictor = GazePredictor(
             model_path='./models/eye_gaze_v31_20.h5',
-            adjustment_model_path='./models/adjustment_model.pkl',
+            adjustment_model_path='./models/adjustment_model.h5',
             shape_predictor_path='./models/shape_predictor_68_face_landmarks.dat',
         )
 
@@ -160,37 +162,53 @@ class ActivityMonitor:
 
             root.mainloop()
 
-    def save_events_to_json(self, file_path="events_data.json"):
+    def save_events_to_temp_json(self):
+        """ Saves events to a temporary JSON file for intermediate storage. """
         event_batch = []
         with self.event_queue_lock:
             while not self.event_queue.empty():
                 event = self.event_queue.get_nowait()
                 event_batch.append(event)
-                self.event_queue.task_done()
         
         if event_batch:
-            existing_data = []
-            # Check if the file already exists and has data
             try:
-                with open(file_path, "r") as file:
-                    existing_data = json.load(file)
-            except (FileNotFoundError, json.JSONDecodeError):
-                # If the file doesn't exist or is empty/corrupted, we start with an empty list
-                existing_data = []
+                print(event_batch)
+                with open("./temp.js", "w") as file:
+                    json.dump(event_batch, file, indent=4)
+            except Exception as e:
+                print(f"Failed to write to {self.temp_data_path}: {e}")
 
-            # Append new events to the existing data
-            updated_data = existing_data + event_batch
-
-            # Write the combined data back to the file
-            with open(file_path, "w") as file:
-                json.dump(updated_data, file, indent=4)
-
-
-    def periodic_data_saving(self, interval=600, file_path="events_data.json"):
+    def periodic_process_and_save(self):
+        """ Periodically processes events for prediction and saves them to the final JSON file every minute. """
         while self.monitoring_active.is_set():
-            time.sleep(interval)
-            self.save_events_to_json(file_path)
+            time.sleep(60)  # Ensure this runs every 60 seconds
+            
+            self.save_events_to_temp_json()  # Save current events to temp.json
 
+            # Load and process the accumulated data
+            if os.path.exists("./temp.json"):
+                preds = self.focus_predictor.predict_focus("./temp.json")
+                self.focus_predictor.print_results(preds)
+            # Clear the temporary file to prepare for new data
+            open(".temp.json", 'w').close()
+
+
+    # def append_to_final_json(self, data, predictions):
+    #     """ Appends processed data and predictions to the final JSON file. """
+    #     try:
+    #         with open(self.final_data_path, "r") as file:
+    #             existing_data = json.load(file)
+    #     except (FileNotFoundError, json.JSONDecodeError):
+    #         existing_data = []
+
+    #     # Convert numpy arrays to lists for JSON serialization
+    #     updated_data = existing_data + [{"data": [d.tolist() for d in data], "predictions": [p.tolist() for p in predictions]}]
+
+    #     try:
+    #         with open(self.final_data_path, "w") as file:
+    #             json.dump(updated_data, file, indent=4)
+    #     except IOError as e:
+    #         print(f"Failed to append to {self.final_data_path}: {e}")
 
 
     def start_monitoring(self):
@@ -199,13 +217,10 @@ class ActivityMonitor:
         
         self.keyboard_listener.start()
         self.mouse_listener.start()
+
+        self.process_and_save_thread = Thread(target=self.periodic_process_and_save, daemon=True)
+        self.process_and_save_thread.start()
         
-        self.focus_thread = Thread(target=self.ask_focus_level, daemon=True)
-        self.focus_thread.start()
-
-        self.window_activity_thread = Thread(target=self.log_active_window_periodically, daemon=True)
-        self.window_activity_thread.start()
-
         self.gaze_monitoring_thread = Thread(target=self.monitor_gaze, daemon=True)
         self.gaze_monitoring_thread.start()
 
