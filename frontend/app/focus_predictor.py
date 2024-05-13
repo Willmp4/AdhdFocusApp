@@ -1,103 +1,86 @@
 import os
 import json
 import numpy as np
-from sklearn.preprocessing import OneHotEncoder
-from keras.models import load_model
-from keras.preprocessing.sequence import pad_sequences
-import joblib
+import pickle
+from tensorflow.keras.models import load_model
+from tensorflow.keras.preprocessing.sequence import pad_sequences
+from sklearn.preprocessing import OneHotEncoder, StandardScaler
+import datetime
 
 class FocusPredictor:
-    def __init__(self, model_path, encoder_path):
+    def __init__(self, model_path, encoder_path, scaler_path):
         self.model = load_model(model_path)
-        self.encoder = joblib.load(encoder_path)
+        self.encoder = self.load_pickle(encoder_path)
+        self.scaler = self.load_pickle(scaler_path)
 
-    def load_data(self, directory):
-        session_data = []
-        for user_folder in os.listdir(directory):
-            print("Loading data for user", user_folder)
-            user_path = os.path.join(directory, user_folder)
-            if os.path.isdir(user_path):
-                for date_folder in os.listdir(user_path):
-                    print("Loading data for date", date_folder)
-                    date_path = os.path.join(user_path, date_folder)
-                    activity_file = 'events_data.json'
-                    print("Loading data from", date_path)
-                    file_path = os.path.join(date_path, activity_file)
-                    if os.path.isfile(file_path):
-                        with open(file_path, 'r') as file:
-                            file_data = json.load(file)
-                            if isinstance(file_data, list):
-                                session_data.append(file_data)  # Each file is one session
-        return session_data
+    def load_pickle(self, path):
+        with open(path, 'rb') as f:
+            return pickle.load(f)
 
-    def preprocess_data(self, session_data, threshold=5):
-        all_features = []
-        all_labels = []
-        for session in session_data:
-            print("Processing session with", len(session), "events")
-            features = []
-            label = None
-            for event in session:
-                if 'focus_level' in event['type']:
-                    focus_level = event['data']['level']
-                    label = 1 if focus_level > threshold else 0
-                    if features and label is not None:
-                        print("Adding session with", len(features), "events")
-                        all_features.append(features)
-                        all_labels.append(label)
-                    features = []
-                else:
-                    event_type = event['type']
-                    position = self.extract_position(event)
-                    button = event['data'].get('button', 'None')
-                    feature = [event['timestamp'], event_type, position, button]
-                    features.append(feature)
-        return all_features, all_labels
-
-    def extract_position(self, event):
-        event_type = event['type']
-        if event_type == 'gaze_data':
-            position = event['data'].get('adjusted_gaze_start_position', [0, 0])
-        elif event_type == 'mouse_movement':
-            start_position = event['data'].get('start_position', [0, 0])
-            end_position = event['data'].get('end_position', [0, 0])
-            position = [(s + e) / 2 for s, e in zip(start_position, end_position)]
-        elif event_type == 'mouse_click':
-            position = event['data'].get('position', [0, 0])
+    def load_json_data(self, file_path):
+        if os.path.isfile(file_path):
+            print(f"Loading data from {file_path}")
+            with open(file_path, 'r') as file:
+                return json.load(file)
         else:
-            position = [0, 0]
-        return position
+            raise FileNotFoundError(f"The file {file_path} does not exist.")
 
-    def encode_features(self, features):
-        all_categories = [[feat[1], feat[3]] for session in features for feat in session]
-        categorical_encoded = self.encoder.transform(all_categories).toarray()
-        position_data = np.array([feat[2] for session in features for feat in session])
-        encoded_features = np.hstack((position_data, categorical_encoded))
-        return encoded_features.reshape(len(features), -1, encoded_features.shape[1])
+    def preprocess_data(self, session_data):
+        features = []
+        for event in session_data:
+            event_type = event.get('type')
+            if event_type not in ['gaze_data', 'mouse_movement', 'mouse_click', 'keyboard_session']:
+                continue
 
-    def create_sequences(self, features, labels, sequence_length=100):
-        padded_features = pad_sequences(features, maxlen=sequence_length, padding='post', dtype='float32')
-        padded_labels = np.array(labels)
-        print(padded_features.shape, padded_labels.shape)
-        return padded_features, padded_labels
+            time_delta = float(event.get('data', {}).get('time_delta', 0.0))
+            feature_data = [0, 0]  # Default values for positions
 
-    def predict_focus(self, encoded_features):
-        predictions = self.model.predict(encoded_features)
+            if event_type == 'gaze_data':
+                feature_data = event['data'].get('adjusted_gaze_start_position', [0, 0])
+            elif event_type == 'mouse_movement':
+                start_position = event['data'].get('start_position', [0, 0])
+                end_position = event['data'].get('end_position', [0, 0])
+                feature_data = [(s + e) / 2 for s, e in zip(start_position, end_position)]
+            elif event_type == 'mouse_click':
+                feature_data = event['data'].get('position', [0, 0])
+            elif event_type == 'keyboard_session':
+                feature_data = [event['data'].get('key_strokes', 0), 0]
+
+            button = event['data'].get('button', 'None')
+            features.append([event['timestamp'], event_type, feature_data, button, time_delta])
+
+        return features
+
+    def encode_and_scale_features(self, features):
+        categorical_data = np.array([[feat[1], feat[3]] for feat in features])
+        positions = np.array([feat[2] for feat in features])
+        time_deltas = np.array([[feat[4]] for feat in features])
+
+        # Normalize time deltas
+        time_deltas = self.scaler.transform(time_deltas)
+
+        # Encode categorical data
+        categorical_encoded = self.encoder.transform(categorical_data).toarray()
+
+        # Combine all features
+        encoded_features = np.hstack((positions, categorical_encoded, time_deltas))
+        return encoded_features
+
+    def create_sequences(self, encoded_features, sequence_length=100):
+        # Padding sequences to ensure they have the same length
+        return pad_sequences([encoded_features], maxlen=sequence_length, padding='post', dtype='float32')
+
+    def predict_focus(self, json_file_path):
+        session_data = self.load_json_data(json_file_path)
+        features = self.preprocess_data(session_data)
+        if not features:
+            return "No valid data to predict."
+
+        encoded_features = self.encode_and_scale_features(features)
+        sequences = self.create_sequences(encoded_features)
+        predictions = self.model.predict(sequences)
         return predictions
 
     def print_results(self, predictions):
         for pred in predictions:
             print(f"Predicted Focus Level: {pred[0]:.2f}")
-
-if __name__ == "__main__":
-    predictor = FocusPredictor(model_path='path_to_your_model.h5', encoder_path='path_to_encoder.pkl')
-    directory = '../../focus_level/'
-    session_data = predictor.load_data(directory)
-    if session_data:
-        features, labels = predictor.preprocess_data(session_data)
-        encoded_features = predictor.encode_features(features)
-        sequences, sequence_labels = predictor.create_sequences(encoded_features, labels)
-        predictions = predictor.predict_focus(sequences)
-        predictor.print_results(predictions)
-    else:
-        print("No session data found")
