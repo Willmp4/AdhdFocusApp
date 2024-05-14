@@ -163,7 +163,7 @@ class ActivityMonitor:
             root.mainloop()
 
     def save_events_to_temp_json(self):
-        """ Saves events to a temporary JSON file for intermediate storage. """
+        """ Saves events to a temporary JSON file for intermediate storage. """     
         event_batch = []
         with self.event_queue_lock:
             while not self.event_queue.empty():
@@ -173,7 +173,7 @@ class ActivityMonitor:
         if event_batch:
             try:
                 print(event_batch)
-                with open("./temp.js", "w") as file:
+                with open("./temp.json", "w") as file:
                     json.dump(event_batch, file, indent=4)
             except Exception as e:
                 print(f"Failed to write to {self.temp_data_path}: {e}")
