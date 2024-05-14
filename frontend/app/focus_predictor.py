@@ -4,9 +4,6 @@ import numpy as np
 import pickle
 from tensorflow.keras.models import load_model
 from tensorflow.keras.preprocessing.sequence import pad_sequences
-from sklearn.preprocessing import OneHotEncoder, StandardScaler
-import datetime
-
 class FocusPredictor:
     def __init__(self, model_path, encoder_path, scaler_path):
         self.model = load_model(model_path)
@@ -32,7 +29,7 @@ class FocusPredictor:
             if event_type not in ['gaze_data', 'mouse_movement', 'mouse_click', 'keyboard_session']:
                 continue
 
-            time_delta = float(event.get('data', {}).get('time_delta', 0.0))
+            time_delta = event.get('time_delta', event['data'].get('time_delta', 0))
             feature_data = [0, 0]  # Default values for positions
 
             if event_type == 'gaze_data':
@@ -44,8 +41,10 @@ class FocusPredictor:
             elif event_type == 'mouse_click':
                 feature_data = event['data'].get('position', [0, 0])
             elif event_type == 'keyboard_session':
-                feature_data = [event['data'].get('key_strokes', 0), 0]
-
+                start_time = event['data'].get('start_time', event['timestamp'])
+                end_time = event['data'].get('end_time', event['timestamp'])
+                duration = (np.datetime64(end_time) - np.datetime64(start_time)).astype('timedelta64[ms]').astype(int)
+                feature_data = [duration, 0] 
             button = event['data'].get('button', 'None')
             features.append([event['timestamp'], event_type, feature_data, button, time_delta])
 
