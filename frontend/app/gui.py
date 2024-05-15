@@ -8,6 +8,7 @@ import pickle
 import os
 import dlib
 from image_processor import ImageProcessor
+from desktop_activity import ActivityMonitor
 from keras.models import load_model
 
 def load_data(calibration_file):
@@ -23,7 +24,7 @@ def gaze_predict(model_path='./models/eye_gaze_v31_20.h5', calibration_file='cal
 
     gaze_model = load_model(model_path)
 
-    #Predict gaze points for each image in the calibration dataset
+    # Predict gaze points for each image in the calibration dataset
     predicted_gaze_points = []
     for image in features:
         image_reshaped = np.expand_dims(image, axis=0)
@@ -42,21 +43,16 @@ def save_model(model, model_path='./models/adjustment_model1.h5'):
     print("Saving model to", model_path)
     # Save the trained model to a file
     model.save(model_path)
-
     print("Model saved to", model_path)
 
-
-def update_model( model_path='./models/adjustment_model.h5'):
-
+def update_model(model_path='./models/adjustment_model.h5'):
     print("Loading existing model.")
     model = load_model(model_path)
-
     adjusment_dataset = gaze_predict()
 
     X = np.squeeze(np.array(adjusment_dataset['predicted_gaze_points']))  # Remove extra dimensions
     y = np.array(adjusment_dataset['actual_gaze_points'])[:, :2]  # Remove extra dimensions
 
-        
     model.fit(X, y)
     save_model(model)
     print("Model updated and saved.")
@@ -112,7 +108,7 @@ class LoginFrame(tk.Frame):
         self.show_frame(MonitoringFrame)
 
 class MonitoringFrame(tk.Frame):
-    def __init__(self, parent, activity_monitor,show_frame):
+    def __init__(self, parent, activity_monitor, show_frame):
         tk.Frame.__init__(self, parent)
         self.activity_monitor = activity_monitor
         self.show_frame = show_frame
@@ -123,6 +119,10 @@ class MonitoringFrame(tk.Frame):
         logout_button = tk.Button(self, text="Logout", command=lambda: self.show_frame(LoginFrame))
         logout_button.pack()
 
+def on_closing(activity_monitor):
+    if messagebox.askokcancel("Quit", "Do you want to quit?"):
+        activity_monitor.stop_monitoring()
+        root.destroy()
 
 def setup_gui(root, activity_monitor):
     # Create a dictionary to hold references to different frames
@@ -143,3 +143,19 @@ def setup_gui(root, activity_monitor):
 
     # Initially show the LoginFrame
     show_frame(LoginFrame)
+
+# Create the main window
+root = tk.Tk()
+root.title("Focus Monitoring App")
+
+# Create an instance of ActivityMonitor
+activity_monitor = ActivityMonitor()
+
+# Setup the GUI with the activity_monitor instance
+setup_gui(root, activity_monitor)
+
+# Set the protocol for closing the window
+root.protocol("WM_DELETE_WINDOW", lambda: on_closing(activity_monitor))
+
+# Start the main event loop
+root.mainloop()

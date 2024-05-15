@@ -12,11 +12,15 @@ import cv2
 from gaze_predictor import GazePredictor
 from focus_predictor import FocusPredictor
 import os
+from focus_trainer import FocusTrainer
+
 class ActivityMonitor:
     MOUSE_MOVE_THROTTLE = 0.5
-    ASK_FOCUS_LEVEL_INTERVAL = 30 * 60
+    INITIAL_ASK_FOCUS_INTERVAL = 30 * 60  # 30 minutes
+    REGULAR_ASK_FOCUS_INTERVAL = 60 * 60  # 60 minutes
     KEYBOARD_SESSION_TIMEOUT = 1
     GAZE_MONITOR_INTERVAL = 0.3
+    MAX_FOCUS_SESSIONS = 15
 
     def __init__(self):
         self.user_id = getpass.getuser()
@@ -33,21 +37,25 @@ class ActivityMonitor:
         self.gaze_start_time = None
         self.gaze_start_position = None
         self.keyboard_session_active = False
-        self.focus_predictor = FocusPredictor('./models/model.h5','./models/encoder.pkl', './models/scaler.pkl')
+        self.focus_predictor = FocusPredictor('./models/model.h5', './models/encoder.pkl', './models/scaler.pkl')
         self.prediction_thread = None
         self.gaze_predictor = GazePredictor(
             model_path='./models/eye_gaze_v31_20.h5',
             adjustment_model_path='./models/adjustment_model.h5',
             shape_predictor_path='./models/shape_predictor_68_face_landmarks.dat',
         )
+        self.next_ask_focus_interval = self.INITIAL_ASK_FOCUS_INTERVAL
+        self.last_focus_query_time = time.time()
+        self.focus_session_count = 0
+        self.focus_trainer = FocusTrainer('./models/model.h5', './models/encoder.pkl', './models/scaler.pkl')
 
     def log_event(self, event_type, data):
         current_time = datetime.now()
         timestamp = current_time.isoformat()
         event = {
-            "timestamp": timestamp, 
-            "type": event_type, 
-            "data": data, 
+            "timestamp": timestamp,
+            "type": event_type,
+            "data": data,
             "time_delta": None  # Initialize time_delta with None
         }
         with self.event_queue_lock:
@@ -140,30 +148,36 @@ class ActivityMonitor:
         cap.release()
 
     def ask_focus_level(self):
-        while self.monitoring_active.is_set():
-            time.sleep(self.ASK_FOCUS_LEVEL_INTERVAL)
-            while self.keyboard_session_active:
-                time.sleep(0.5)
-            root = tk.Tk()
-            root.attributes('-topmost', True)
-            root.focus_force()
-            root.title("Focus Level")
+        while self.monitoring_active.is_set() and self.focus_session_count < self.MAX_FOCUS_SESSIONS:
+            time_since_last_query = time.time() - self.last_focus_query_time
+            if time_since_last_query >= self.next_ask_focus_interval:
+                while self.keyboard_session_active:
+                    time.sleep(0.5)
+                root = tk.Tk()
+                root.attributes('-topmost', True)
+                root.focus_force()
+                root.title("Focus Level")
 
-            def on_submit():
-                focus_level = scale.get()
-                self.log_event('focus_level', {'level': focus_level})
-                root.destroy()
-                self.periodic_data_saving()
+                def on_submit():
+                    focus_level = scale.get()
+                    self.log_event('focus_level', {'level': focus_level})
+                    root.destroy()
+                    self.last_focus_query_time = time.time()
+                    self.next_ask_focus_interval = self.REGULAR_ASK_FOCUS_INTERVAL  # Switch to regular interval
+                    self.focus_session_count += 1
+                    self.save_events_to_temp_json()
 
-            tk.Label(root, text="Rate your focus level:").pack()
-            scale = tk.Scale(root, from_=0, to=10, orient='horizontal')
-            scale.pack()
-            tk.Button(root, text="Submit", command=on_submit).pack()
+                tk.Label(root, text="Rate your focus level:").pack()
+                scale = tk.Scale(root, from_=0, to=10, orient='horizontal')
+                scale.pack()
+                tk.Button(root, text="Submit", command=on_submit).pack()
 
-            root.mainloop()
+                root.mainloop()
+            else:
+                time.sleep(60)  # Check again in 60 seconds
 
     def save_events_to_temp_json(self):
-        """ Saves events to a temporary JSON file for intermediate storage. """     
+        """ Saves events to a temporary JSON file for intermediate storage and appends to the final JSON file. """     
         event_batch = []
         with self.event_queue_lock:
             while not self.event_queue.empty():
@@ -172,44 +186,43 @@ class ActivityMonitor:
         
         if event_batch:
             try:
-                print(event_batch)
-                with open("./temp.json", "w") as file:
-                    json.dump(event_batch, file, indent=4)
+                # Save to temp.json
+                with open("./temp.json", "w") as temp_file:
+                    json.dump(event_batch, temp_file, indent=4)
+                    
+                # Append to final.json
+                final_file_path = "./final.json"
+                if not os.path.exists(final_file_path):
+                    with open(final_file_path, "w") as final_file:
+                        json.dump(event_batch, final_file, indent=4)
+                else:
+                    with open(final_file_path, "r+") as final_file:
+                        try:
+                            existing_data = json.load(final_file)
+                            if isinstance(existing_data, list):
+                                existing_data.extend(event_batch)
+                            else:
+                                existing_data = event_batch
+                        except json.JSONDecodeError:
+                            existing_data = event_batch
+
+                        final_file.seek(0)
+                        json.dump(existing_data, final_file, indent=4)
+                        final_file.truncate()
             except Exception as e:
-                print(f"Failed to write to {self.temp_data_path}: {e}")
+                print(f"Failed to write to JSON files: {e}")
 
     def periodic_process_and_save(self):
         """ Periodically processes events for prediction and saves them to the final JSON file every minute. """
         while self.monitoring_active.is_set():
             time.sleep(60)  # Ensure this runs every 60 seconds
             
-            self.save_events_to_temp_json()  # Save current events to temp.json
+            self.save_events_to_temp_json()  # Save current events to temp.json and append to final.json
 
             # Load and process the accumulated data
             if os.path.exists("./temp.json"):
                 preds = self.focus_predictor.predict_focus("./temp.json")
                 self.focus_predictor.print_results(preds)
-            # Clear the temporary file to prepare for new data
-            open(".temp.json", 'w').close()
-
-
-    # def append_to_final_json(self, data, predictions):
-    #     """ Appends processed data and predictions to the final JSON file. """
-    #     try:
-    #         with open(self.final_data_path, "r") as file:
-    #             existing_data = json.load(file)
-    #     except (FileNotFoundError, json.JSONDecodeError):
-    #         existing_data = []
-
-    #     # Convert numpy arrays to lists for JSON serialization
-    #     updated_data = existing_data + [{"data": [d.tolist() for d in data], "predictions": [p.tolist() for p in predictions]}]
-
-    #     try:
-    #         with open(self.final_data_path, "w") as file:
-    #             json.dump(updated_data, file, indent=4)
-    #     except IOError as e:
-    #         print(f"Failed to append to {self.final_data_path}: {e}")
-
 
     def start_monitoring(self):
         self.keyboard_listener = keyboard.Listener(on_press=self.on_press)
@@ -224,7 +237,14 @@ class ActivityMonitor:
         self.gaze_monitoring_thread = Thread(target=self.monitor_gaze, daemon=True)
         self.gaze_monitoring_thread.start()
 
+        self.focus_level_thread = Thread(target=self.ask_focus_level, daemon=True)
+        self.focus_level_thread.start()
+
+
     def stop_monitoring(self):
         self.monitoring_active.clear()
         self.keyboard_listener.stop()
         self.mouse_listener.stop()
+        # Retrain the model on exit if final.json exists
+        if os.path.exists('./final.json') and os.path.getsize('./final.json') > 0:
+            self.focus_trainer.retrain_model('./final.json')
