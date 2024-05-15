@@ -143,19 +143,3 @@ def setup_gui(root, activity_monitor):
 
     # Initially show the LoginFrame
     show_frame(LoginFrame)
-
-# Create the main window
-root = tk.Tk()
-root.title("Focus Monitoring App")
-
-# Create an instance of ActivityMonitor
-activity_monitor = ActivityMonitor()
-
-# Setup the GUI with the activity_monitor instance
-setup_gui(root, activity_monitor)
-
-# Set the protocol for closing the window
-root.protocol("WM_DELETE_WINDOW", lambda: on_closing(activity_monitor))
-
-# Start the main event loop
-root.mainloop()
