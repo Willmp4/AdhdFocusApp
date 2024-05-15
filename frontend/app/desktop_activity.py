@@ -16,8 +16,8 @@ from focus_trainer import FocusTrainer
 
 class ActivityMonitor:
     MOUSE_MOVE_THROTTLE = 0.5
-    INITIAL_ASK_FOCUS_INTERVAL = 30 * 60  # 30 minutes
-    REGULAR_ASK_FOCUS_INTERVAL = 60 * 60  # 60 minutes
+    INITIAL_ASK_FOCUS_INTERVAL = 60
+    REGULAR_ASK_FOCUS_INTERVAL = 60 * 2 
     KEYBOARD_SESSION_TIMEOUT = 1
     GAZE_MONITOR_INTERVAL = 0.3
     MAX_FOCUS_SESSIONS = 15
@@ -37,17 +37,17 @@ class ActivityMonitor:
         self.gaze_start_time = None
         self.gaze_start_position = None
         self.keyboard_session_active = False
-        self.focus_predictor = FocusPredictor('./models/model.h5', './models/encoder.pkl', './models/scaler.pkl')
+        self.focus_predictor = FocusPredictor('./models/model_v2.h5', './models/encoder_v2.pkl', './models/scaler_v2.pkl')
         self.prediction_thread = None
         self.gaze_predictor = GazePredictor(
             model_path='./models/eye_gaze_v31_20.h5',
-            adjustment_model_path='./models/adjustment_model.h5',
+            adjustment_model_path='./models/adjustment_model1.h5',
             shape_predictor_path='./models/shape_predictor_68_face_landmarks.dat',
         )
         self.next_ask_focus_interval = self.INITIAL_ASK_FOCUS_INTERVAL
         self.last_focus_query_time = time.time()
         self.focus_session_count = 0
-        self.focus_trainer = FocusTrainer('./models/model.h5', './models/encoder.pkl', './models/scaler.pkl')
+        self.focus_trainer = FocusTrainer('./models/model_v2.h5', './models/encoder_v2.pkl', './models/scaler_v2.pkl')
 
     def log_event(self, event_type, data):
         current_time = datetime.now()
