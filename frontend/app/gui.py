@@ -119,7 +119,7 @@ class MonitoringFrame(tk.Frame):
         logout_button = tk.Button(self, text="Logout", command=lambda: self.show_frame(LoginFrame))
         logout_button.pack()
 
-def on_closing(activity_monitor):
+def on_closing(activity_monitor, root):
     if messagebox.askokcancel("Quit", "Do you want to quit?"):
         activity_monitor.stop_monitoring()
         root.destroy()
