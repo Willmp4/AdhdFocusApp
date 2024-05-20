@@ -16,11 +16,12 @@ from focus_trainer import FocusTrainer
 
 class ActivityMonitor:
     MOUSE_MOVE_THROTTLE = 0.5
-    INITIAL_ASK_FOCUS_INTERVAL = 60
-    REGULAR_ASK_FOCUS_INTERVAL = 60 * 2 
+    INITIAL_ASK_FOCUS_INTERVAL = 60 * 30  # 30 minutes
+    REGULAR_ASK_FOCUS_INTERVAL = 60 * 60  # 1 hour 
     KEYBOARD_SESSION_TIMEOUT = 1
     GAZE_MONITOR_INTERVAL = 0.3
     MAX_FOCUS_SESSIONS = 15
+    UNFOCUSED_THRESHOLD = 5 * 60  # 5 minutes
 
     def __init__(self):
         self.user_id = getpass.getuser()
@@ -35,6 +36,8 @@ class ActivityMonitor:
         self.last_keyboard_activity_time = None 
         self.window_activity_thread = None
         self.gaze_start_time = None
+        self.keyboard_listener = None
+        self.mouse_listener = None
         self.gaze_start_position = None
         self.keyboard_session_active = False
         self.focus_predictor = FocusPredictor('./models/model_v2.h5', './models/encoder_v2.pkl', './models/scaler_v2.pkl')
@@ -48,6 +51,8 @@ class ActivityMonitor:
         self.last_focus_query_time = time.time()
         self.focus_session_count = 0
         self.focus_trainer = FocusTrainer('./models/model_v2.h5', './models/encoder_v2.pkl', './models/scaler_v2.pkl')
+        self.unfocused_duration = 0
+        self.last_focus_check_time = time.time()
 
     def log_event(self, event_type, data):
         current_time = datetime.now()
@@ -223,6 +228,27 @@ class ActivityMonitor:
             if os.path.exists("./temp.json"):
                 preds = self.focus_predictor.predict_focus("./temp.json")
                 self.focus_predictor.print_results(preds)
+
+                # Check the prediction results and update unfocused duration
+                if preds and preds[0] < 0.5:
+                    self.unfocused_duration += 60
+                else:
+                    self.unfocused_duration = 0
+
+                # Trigger an intervention if the unfocused duration exceeds the threshold
+                if self.unfocused_duration >= self.UNFOCUSED_THRESHOLD:
+                    self.show_intervention_popup()
+
+    def show_intervention_popup(self):
+        root = tk.Tk()
+        root.attributes('-topmost', True)
+        root.focus_force()
+        root.title("Focus Alert")
+
+        tk.Label(root, text="You've been unfocused for a while. Consider taking a break.").pack()
+        tk.Button(root, text="Okay", command=root.destroy).pack()
+
+        root.mainloop()
 
     def start_monitoring(self):
         self.keyboard_listener = keyboard.Listener(on_press=self.on_press)
