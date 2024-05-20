@@ -2,13 +2,8 @@ import os
 import json
 import numpy as np
 import pickle
-from sklearn.preprocessing import OneHotEncoder
 from tensorflow.keras.preprocessing.sequence import pad_sequences
-from tensorflow.keras.models import Sequential, load_model
-from tensorflow.keras.layers import LSTM, Dense, Dropout, Bidirectional, BatchNormalization
-from sklearn.preprocessing import StandardScaler
-from sklearn.model_selection import train_test_split
-
+from tensorflow.keras.models import load_model
 class FocusTrainer:
     def __init__(self, model_path, encoder_path, scaler_path):
         self.model_path = model_path
@@ -123,6 +118,7 @@ class FocusTrainer:
             raise ValueError(f"Model input shape {model.input_shape[1:]} does not match data shape {X.shape[1:]}.")
 
         model.fit(X, y, epochs=10, batch_size=32)
+        
 
         # Save the retrained model and preprocessors
         self.save_model_and_preprocessors(model, encoder, scaler)
